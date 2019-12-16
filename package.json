@@ -1,0 +1,10 @@
+{
+    "name": "com.utj.memorysnapshot2csv",
+    "displayName": "MemoryProfilerToCsv",
+    "version": "0.1.0",
+    "unity": "2018.3",
+    "description": "MemoryProfilerSnapshot to csv file",
+    "keywords": ["MemoryProfiler"],
+    "category": "profiler",
+    "dependencies": {}
+}
