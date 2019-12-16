@@ -334,10 +334,9 @@ namespace UTJ
                 {
                     csvGenerator.AppendColumn("").AppendColumn("").AppendColumn("");
                 }
-
                 csvGenerator.NextRow();
-
             }
+            System.IO.File.WriteAllText(str + "-nativeAllocations.csv", csvGenerator.ToString());
 
         }
 
