@@ -6,34 +6,6 @@ using UnityEditor;
 using UnityEditor.Profiling.Memory;
 using UnityEditor.Profiling.Memory.Experimental;
 
-namespace UTJ
-{
-    public class MemorySnapshotToCsvWindow : EditorWindow
-    {
-
-        private static string memoryFile = "";
-        [MenuItem("Tools/MemoryCsv")]
-        public static void Create()
-        {
-            EditorWindow.GetWindow<MemorySnapshotToCsvWindow>();
-        }
-
-        private void OnGUI()
-        {
-            memoryFile = EditorGUILayout.TextField(memoryFile);
-            if (GUILayout.Button("File"))
-            {
-                memoryFile = EditorUtility.OpenFilePanel("SelectSnapShot", "", "snap");
-            }
-            if (GUILayout.Button("Exec"))
-            {
-                UTJ.MemorySnapshotToCsv obj = new UTJ.MemorySnapshotToCsv(memoryFile);
-                EditorUtility.DisplayDialog("CSV Complete", System.IO.Directory.GetCurrentDirectory(), "OK");
-            }
-        }
-
-    }
-}
 
 namespace UTJ
 {
@@ -86,12 +58,33 @@ namespace UTJ
             public int firstAllocationIndex;
             public int numAllocations;
         }
+        class ManagedType
+        {
+            public TypeFlags flags;
+            public string typeDescriptionName;
+            public string assembly;
+            public int[] fieldIndices;
+            public byte[] staticFieldBytes;
+            public int baseOrElementTypeIndex;
+            public int size;
+            public ulong typeInfoAddress;
+            public int typeIndex;
+        }
+        class ManagedMemory
+        {
+            public ulong startAddress;
+            public byte[] bytes;
+        }
 
         private List<NativeTypeName> nativeTypes;
         private List<NativeObjectEntry> nativeObjects;
         private List<NativeAllocation> nativeAllocations;
         private Dictionary<long, RootReference> rootReferences;
         private List<MemoryRegion> memoryRegions;
+        private List<ManagedType> managedTypes;
+
+        private List<ManagedMemory> managedHeap;
+        private List<ManagedMemory> managedStack;
 
 
         public MemorySnapshotToCsv(string filePath)
@@ -102,7 +95,9 @@ namespace UTJ
             CreateNativeAllocation(snapshot.nativeAllocations);
             CreateRootReferences(snapshot.nativeRootReferences);
             CreateMemoryRegion(snapshot.nativeMemoryRegions);
-
+            CreateManagedTypes(snapshot.typeDescriptions);
+            CreateManagedMemory(snapshot.managedHeapSections, ref managedHeap);
+            CreateManagedMemory(snapshot.managedStacks, ref managedStack);
 
             Save(System.IO.Path.GetFileName(filePath));                        
         }
@@ -111,6 +106,9 @@ namespace UTJ
         {
             int num = (int)nativeTypeEntries.GetNumEntries();
             this.nativeTypes = new List<NativeTypeName>(num);
+            if (num == 0) { return; }
+
+
             string[] typeName = new string[num];
             int[] nativeBaseTypeArrayIndex = new int[num];
 
@@ -130,6 +128,7 @@ namespace UTJ
         {
             int num = (int)nativeObjectEntries.GetNumEntries();
             this.nativeObjects = new List<NativeObjectEntry>(num);
+            if (num == 0) { return; }
 
 
             string[] names = new string[num];
@@ -174,6 +173,9 @@ namespace UTJ
         private void CreateNativeAllocation(NativeAllocationEntries allocationEntries)
         {
             int num = (int)allocationEntries.GetNumEntries();
+            this.nativeAllocations = new List<NativeAllocation>(num);
+            if (num == 0) { return; }
+
             int[] memoryRegionIndex = new int[num];
             long[] rootReferenceId = new long[num];
             long[] allocationSiteId = new long[num];
@@ -189,7 +191,6 @@ namespace UTJ
             allocationEntries.overheadSize.GetEntries(0, (uint)num, ref overhead);
             allocationEntries.paddingSize.GetEntries(0, (uint)num, ref paddingSize);
 
-            this.nativeAllocations = new List<NativeAllocation>(num);
             for( int i = 0; i < num; ++i)
             {
                 var entry = new NativeAllocation();
@@ -214,6 +215,9 @@ namespace UTJ
         {
             int num = (int)rootReferenceEntries.GetNumEntries();
             this.rootReferences = new Dictionary<long, RootReference>(num);
+            if (num == 0) { return; }
+
+
             long[] id = new long[num];
             string[] areaName = new string[num];
             string[] objectName = new string[num];
@@ -238,6 +242,7 @@ namespace UTJ
         {
             int num = (int)nativeMemoryRegionEntries.GetNumEntries();
             this.memoryRegions = new List<MemoryRegion>(num);
+            if (num == 0) { return; }
 
 
             string[] memoryRegionName = new string[num];
@@ -266,11 +271,81 @@ namespace UTJ
 
         }
 
+        private void CreateManagedTypes(TypeDescriptionEntries typeDescriptionEntries)
+        {
+            int num = (int)typeDescriptionEntries.GetNumEntries();
+            this.managedTypes = new List<ManagedType>(num);
+            if (num == 0) { return; }
+
+            TypeFlags[] flags = new TypeFlags[num];
+            string[] typeDescriptionName = new string[num];
+            string[] assembly = new string[num];
+            int[][] fieldIndices = new int[num][];
+            byte[][] staticFieldBytes = new byte[num][];
+            int[] baseOrElementTypeIndex = new int[num];
+            int[] size = new int [num];
+            ulong[] typeInfoAddress = new ulong[num];
+            int[] typeIndex = new int[num];
+
+            typeDescriptionEntries.flags.GetEntries(0, (uint)num, ref flags);
+            typeDescriptionEntries.typeDescriptionName.GetEntries(0, (uint)num, ref typeDescriptionName);
+            typeDescriptionEntries.assembly.GetEntries(0, (uint)num, ref assembly);
+            typeDescriptionEntries.fieldIndices.GetEntries(0, (uint)num, ref fieldIndices);
+            typeDescriptionEntries.staticFieldBytes.GetEntries(0, (uint)num, ref staticFieldBytes);
+            typeDescriptionEntries.baseOrElementTypeIndex.GetEntries(0, (uint)num, ref baseOrElementTypeIndex);
+            typeDescriptionEntries.size.GetEntries(0, (uint)num, ref size);
+            typeDescriptionEntries.typeInfoAddress.GetEntries(0, (uint)num, ref typeInfoAddress);
+            typeDescriptionEntries.typeIndex.GetEntries(0, (uint)num, ref typeIndex);
+
+            for(int i = 0; i < num; ++i)
+            {
+                var entry = new ManagedType();
+                entry.flags = flags[i];
+                entry.typeDescriptionName = typeDescriptionName[i];
+                entry.assembly = assembly[i];
+                entry.fieldIndices = fieldIndices[i];
+                entry.staticFieldBytes = staticFieldBytes[i];
+                entry.baseOrElementTypeIndex = baseOrElementTypeIndex[i];
+                entry.size = size[i];
+                entry.typeInfoAddress = typeInfoAddress[i];
+                entry.typeIndex = typeIndex[i];
+                this.managedTypes.Add(entry);
+            }
+        }
+
+
+        private void CreateManagedMemory(ManagedMemorySectionEntries managedMemorySection,ref List<ManagedMemory> managedMemories)
+        {
+            int num = (int)managedMemorySection.GetNumEntries();
+            managedMemories = new List<ManagedMemory>(num);
+            if (num == 0) { return; }
+            ulong[] startAddress = new ulong[num];
+            byte[][] bytes = new byte[num][];
+
+            managedMemorySection.startAddress.GetEntries(0, (uint)num, ref startAddress);
+            managedMemorySection.bytes.GetEntries(0, (uint)num, ref bytes);
+
+            for( int i = 0; i < num; ++i)
+            {
+                var entry = new ManagedMemory();
+                entry.startAddress = startAddress[i];
+                entry.bytes = bytes[i];
+                managedMemories.Add(entry);
+            }
+        }
 
 
         private void Save(string originFile)
         {
             var str = originFile.Remove(originFile.Length - 5);
+            SaveNativeObjects(str);
+            SaveNativeAllocation(str);
+            SaveManagedAllocations(str);
+            SaveManagedTypeList(str);
+        }
+
+        private void SaveNativeObjects(string origin)
+        {
             CsvStringGenerator csvGenerator = new CsvStringGenerator();
             csvGenerator.AppendColumn("address").AppendColumn("size").AppendColumn("name").AppendColumn("typeName").AppendColumn("instanceId");
             csvGenerator.AppendColumn("rootReferenceId").AppendColumn("rootAreaName").AppendColumn("rootObjectName").AppendColumn("rootaccumulatedSize");
@@ -296,17 +371,19 @@ namespace UTJ
                 }
                 csvGenerator.NextRow();
             }
-            System.IO.File.WriteAllText(str + "-nativeObjects.csv", csvGenerator.ToString());
-
-            // 
-            csvGenerator = new CsvStringGenerator();
+            System.IO.File.WriteAllText(origin + "-nativeObjects.csv", csvGenerator.ToString());
+        }
+        private void SaveNativeAllocation(string origin)
+        {
+            // nativeAllocations
+            CsvStringGenerator csvGenerator = new CsvStringGenerator();
             csvGenerator.AppendColumn("address").AppendColumn("Size").AppendColumn("overhead size").AppendColumn("padding size");
             csvGenerator.AppendColumn("regionId").AppendColumn("regionName").AppendColumn("regionBase").AppendColumn("regionSize");
             csvGenerator.AppendColumn("rootReferenceId").AppendColumn("rootAreaName").AppendColumn("rootObjectName").AppendColumn("rootaccumulatedSize");
             csvGenerator.NextRow();
-            foreach( var entry in this.nativeAllocations)
+            foreach (var entry in this.nativeAllocations)
             {
-                csvGenerator.AppendColumn(string.Format("0x{0:X16}", entry.address) );
+                csvGenerator.AppendColumn(string.Format("0x{0:X16}", entry.address));
                 csvGenerator.AppendColumn(entry.size);
                 csvGenerator.AppendColumn(entry.overhead);
                 csvGenerator.AppendColumn(entry.paddingSize);
@@ -314,10 +391,10 @@ namespace UTJ
                 // region
                 csvGenerator.AppendColumn(entry.memoryRegionIndex);
                 MemoryRegion region = null;
-                region = this.memoryRegions[ entry.memoryRegionIndex];
-                if( region != null)
+                region = this.memoryRegions[entry.memoryRegionIndex];
+                if (region != null)
                 {
-                    csvGenerator.AppendColumn(region.memoryRegionName).AppendColumn( string.Format("{0:X16}",region.addressBase) ).AppendColumn(region.addressSize);
+                    csvGenerator.AppendColumn(region.memoryRegionName).AppendColumn(string.Format("{0:X16}", region.addressBase)).AppendColumn(region.addressSize);
                 }
                 else
                 {
@@ -326,7 +403,7 @@ namespace UTJ
                 // root reference
                 csvGenerator.AppendColumn(entry.rootReferenceId);
                 RootReference rootReference = null;
-                if ( this.rootReferences.TryGetValue(entry.rootReferenceId,out rootReference))
+                if (this.rootReferences.TryGetValue(entry.rootReferenceId, out rootReference))
                 {
                     csvGenerator.AppendColumn(rootReference.areaName).AppendColumn(rootReference.objectName).AppendColumn(rootReference.accumulatedSize);
                 }
@@ -336,9 +413,68 @@ namespace UTJ
                 }
                 csvGenerator.NextRow();
             }
-            System.IO.File.WriteAllText(str + "-nativeAllocations.csv", csvGenerator.ToString());
+            System.IO.File.WriteAllText(origin + "-nativeAllocations.csv", csvGenerator.ToString());
 
         }
 
+
+        private void SaveManagedAllocations(string origin)
+        {
+            CsvStringGenerator csvGenerator = new CsvStringGenerator();
+            csvGenerator.AppendColumn("type").AppendColumn("address").AppendColumn("size");
+            csvGenerator.NextRow();
+            foreach (var entry in this.managedHeap)
+            {
+                csvGenerator.AppendColumn("Heap").
+                    AppendColumn(string.Format("0x{0:X16}", entry.startAddress)).AppendColumn(entry.bytes.Length);
+                csvGenerator.NextRow();
+            }
+            foreach (var entry in this.managedStack)
+            {
+                csvGenerator.AppendColumn("Stack").
+                    AppendColumn(string.Format("0x{0:X16}", entry.startAddress)).AppendColumn(entry.bytes.Length);
+                csvGenerator.NextRow();
+            }
+            System.IO.File.WriteAllText(origin + "-managedAllocation.csv", csvGenerator.ToString());
+
+        }
+
+        private void SaveManagedTypeList(string origin)
+        {
+            CsvStringGenerator csvGenerator = new CsvStringGenerator();
+            var copyList = new List<ManagedType>(this.managedTypes);
+            copyList.Sort((a, b) =>
+            {
+                int val = string.Compare(a.assembly, b.assembly);
+                if (val != 0) { return val; }
+                return string.Compare(a.typeDescriptionName, b.typeDescriptionName);
+            });
+
+            csvGenerator.AppendColumn("assembly").
+                AppendColumn("typeName").
+                AppendColumn("size").
+                AppendColumn("staticFieldSize");
+            csvGenerator.NextRow();
+
+            foreach (var entry in copyList)
+            {
+                csvGenerator.AppendColumn(entry.assembly).
+                    AppendColumn(entry.typeDescriptionName).
+                    AppendColumn(entry.size);
+                if(entry.staticFieldBytes != null)
+                {
+                    csvGenerator.AppendColumn(entry.staticFieldBytes.Length);
+                }
+                else
+                {
+                    csvGenerator.AppendColumn("");
+                }
+                
+                csvGenerator.NextRow();
+
+            }
+
+            System.IO.File.WriteAllText(origin + "-managedTypes.csv", csvGenerator.ToString());
+        }
     }
 }
