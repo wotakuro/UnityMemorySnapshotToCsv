@@ -544,38 +544,43 @@ namespace UTJ
         private void SaveManagedObjectList(string origin)
         {
             CsvStringGenerator csvGenerator = new CsvStringGenerator();
-            csvGenerator.AppendColumn("address");
+            csvGenerator.AppendColumn("address").AppendColumn("type");
             csvGenerator.NextRow();
             foreach (var entry in this.gcHandles)
             {
                 var managedMemory =  GetManagedMemory(entry.address);
-
                 csvGenerator.AppendColumn(string.Format(x16StrFormat, entry.address));
                 if( managedMemory != null)
                 {
-                    int offset = (int)(entry.address - managedMemory.startAddress);
-                    ulong typeAddr = ReadPointer(managedMemory.bytes, offset);
-
-
-                    csvGenerator.AppendColumn(string.Format(x16StrFormat, typeAddr));
-                    csvGenerator.AppendColumn(string.Format(x16StrFormat, ReadPointer(managedMemory.bytes, offset + 4)));
-                    csvGenerator.AppendColumn(string.Format(x16StrFormat, ReadPointer(managedMemory.bytes, offset + 8)));
-                    csvGenerator.AppendColumn(string.Format(x16StrFormat, ReadPointer(managedMemory.bytes, offset + 12)));
-                    ManagedType typeInfo = null;
-                    if (managedTypeByAddr.TryGetValue(typeAddr, out typeInfo))
+                    ManagedType typeInfo = GetManagedTypeInfoFromAddr(entry.address);
+                    if (typeInfo != null)
                     {
                         csvGenerator.AppendColumn(typeInfo.typeDescriptionName);
                     }
-
-                    //csvGenerator.AppendColumn( typeInfo.typeDescriptionName);
                 }
                 csvGenerator.NextRow();
             }
             System.IO.File.WriteAllText(origin + "-managedObjects.csv", csvGenerator.ToString());            
         }
 
+        private ManagedType GetManagedTypeInfoFromAddr(ulong address,int depth = 0)
+        {
+            if(depth >1) { return null; }
+            var managedMemory = GetManagedMemory(address);
+            if (managedMemory == null) { return null; }
 
-        private ManagedMemory GetManagedMemory(ulong addr)
+            int offset = (int)(address - managedMemory.startAddress);
+            ulong newAddr = ReadPointer(managedMemory.bytes, offset);
+            ManagedType typeInfo = null;
+            if (managedTypeByAddr.TryGetValue(newAddr, out typeInfo))
+            {
+                return typeInfo;
+            }
+            return GetManagedTypeInfoFromAddr(newAddr, depth + 1) ;
+        }
+
+
+            private ManagedMemory GetManagedMemory(ulong addr)
         {
             int length = sortedManagedMemory.Count;
             int minIdx = 0;
