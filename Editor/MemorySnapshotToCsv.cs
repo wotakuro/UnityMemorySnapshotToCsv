@@ -70,6 +70,14 @@ namespace UTJ
             public ulong typeInfoAddress;
             public int typeIndex;
         }
+        class ManagedFieldInfo
+        {
+            public string fieldDescriptionName;
+            public int offset;
+            public int typeIndex;
+            public bool isStatic;
+        }
+
         class ManagedMemory
         {
             public ulong startAddress;
@@ -87,6 +95,7 @@ namespace UTJ
         private Dictionary<long, RootReference> rootReferences;
         private List<MemoryRegion> memoryRegions;
         private List<ManagedType> managedTypes;
+        private List<ManagedFieldInfo> managedFieldInfos;
         private Dictionary<ulong, ManagedType> managedTypeByAddr;
 
         private List<ManagedMemory> managedHeap;
@@ -112,12 +121,15 @@ namespace UTJ
         public MemorySnapshotToCsv(string filePath)
         {
             snapshot = PackedMemorySnapshot.Load(filePath);
+
             CreateNativeObjectType(snapshot.nativeTypes);
             CreateNativeObjects(snapshot.nativeObjects);
             CreateNativeAllocation(snapshot.nativeAllocations);
             CreateRootReferences(snapshot.nativeRootReferences);
             CreateMemoryRegion(snapshot.nativeMemoryRegions);
             CreateManagedTypes(snapshot.typeDescriptions);
+            CreateManagedFieldInfos(snapshot.fieldDescriptions);
+
             CreateManagedMemory(snapshot.managedHeapSections, ref managedHeap);
             CreateManagedMemory(snapshot.managedStacks, ref managedStack);
             CreateSortedMangedMemoryList();
@@ -335,6 +347,34 @@ namespace UTJ
                 managedTypeByAddr.Add(entry.typeInfoAddress, entry);
             }
         }
+
+        private void CreateManagedFieldInfos(FieldDescriptionEntries fieldDescriptionEntries)
+        {
+            int num = (int)fieldDescriptionEntries.GetNumEntries();
+            this.managedFieldInfos = new List<ManagedFieldInfo>(num);
+            if (num == 0) { return; }
+
+            string[] fieldDescriptionName = new string[num];
+            int[] offset = new int[num];
+            int[] typeIndex = new int[num];
+            bool[] isStatic = new bool[num];
+
+            fieldDescriptionEntries.fieldDescriptionName.GetEntries(0, (uint)num, ref fieldDescriptionName);
+            fieldDescriptionEntries.offset.GetEntries(0, (uint)num, ref offset);
+            fieldDescriptionEntries.typeIndex.GetEntries(0, (uint)num, ref typeIndex);
+            fieldDescriptionEntries.isStatic.GetEntries(0, (uint)num, ref isStatic);
+
+            for (int i = 0; i < num; ++i)
+            {
+                var entry = new ManagedFieldInfo();
+                entry.fieldDescriptionName = fieldDescriptionName[i];
+                entry.offset = offset[i];
+                entry.typeIndex = typeIndex[i];
+                entry.isStatic = isStatic[i];
+                this.managedFieldInfos.Add(entry);
+            }
+        }
+
         private void CreateManagedMemory(ManagedMemorySectionEntries managedMemorySection,ref List<ManagedMemory> managedMemories)
         {
             int num = (int)managedMemorySection.GetNumEntries();
@@ -533,7 +573,11 @@ namespace UTJ
                 {
                     csvGenerator.AppendColumn("");
                 }
-                csvGenerator.AppendColumn(string.Format(x16StrFormat, entry.typeInfoAddress));
+                // debug
+                csvGenerator.AppendColumn(entry.typeIndex);
+                csvGenerator.AppendColumn(managedTypes[entry.typeIndex].typeDescriptionName);
+                csvGenerator.AppendColumn(managedTypes[entry.typeIndex].staticFieldBytes.Length);
+
                 csvGenerator.NextRow();
             }
 
@@ -560,6 +604,13 @@ namespace UTJ
                 }
                 csvGenerator.NextRow();
             }
+
+            foreach(var entry in this.managedTypes)
+            {
+                int idx = entry.typeIndex;
+                //managedTypes[idx].staticFieldBytes <- ここからも取ってくるみたい
+            }
+
             System.IO.File.WriteAllText(origin + "-managedObjects.csv", csvGenerator.ToString());            
         }
 
@@ -580,7 +631,7 @@ namespace UTJ
         }
 
 
-            private ManagedMemory GetManagedMemory(ulong addr)
+        private ManagedMemory GetManagedMemory(ulong addr)
         {
             int length = sortedManagedMemory.Count;
             int minIdx = 0;
