@@ -1,7 +1,7 @@
 ﻿using System.Text;
 
 
-namespace UTJ
+namespace UTJ.MemoryProfilerToCsv
 {
     public class CsvStringGenerator
     {

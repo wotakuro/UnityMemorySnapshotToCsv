@@ -1,21 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
-
-using UnityEditor.Profiling.Memory;
-using UnityEditor.Profiling.Memory.Experimental;
+﻿using System.Collections.Generic;
 
 
-namespace UTJ
+namespace UTJ.MemoryProfilerToCsv
 {
 
     public class MemorySnapshotToCsv
     {
         private MemorySnapshotCacheData cacheSnapshot;
-
-
-
+        
         public MemorySnapshotToCsv(string filePath)
         {
             cacheSnapshot = new MemorySnapshotCacheData(filePath);
@@ -32,8 +24,7 @@ namespace UTJ
             SaveManagedTypeList(str);
             SaveManagedObjectList(str);
 
-            // debug
-            //SaveFieldInfo(str);
+            SaveMergedMemoryImageInfo(str);
         }
 
 
@@ -242,8 +233,47 @@ namespace UTJ
             }
             System.IO.File.WriteAllText(origin + "-managedFieldInfo.csv", csvGenerator.ToString());
         }
-        
-        
+
+        private void SaveMergedMemoryImageInfo(string origin)
+        {
+            MemorySnapshotMap memorySnapshotMap = new MemorySnapshotMap(cacheSnapshot);
+            CsvStringGenerator csvGenerator = new CsvStringGenerator();
+            csvGenerator.AppendColumn("idx").AppendColumn("parentIdx").AppendColumn("StartAddress").AppendColumn("EndAddress").AppendColumn("Size").AppendColumn("type");
+            csvGenerator.NextRow();
+            ulong lastEnd = 0;
+            int lastIdx = 0;
+            int idx = 0;
+            foreach( var memory in memorySnapshotMap.memoryLists)
+            {
+                if( memory.memorySize == 0) { continue; }
+
+                csvGenerator.AppendColumn(idx);
+
+                if (lastEnd > memory.addressStart)
+                {
+                    csvGenerator.AppendColumn(lastIdx);
+                }
+                else
+                {
+                    csvGenerator.AppendColumn(-1);
+                }
+                if (lastEnd < memory.addressEnd)
+                {
+                    lastIdx = idx;
+                    lastEnd = memory.addressEnd;
+                }
+
+                csvGenerator.AppendColumn( string.Format(cacheSnapshot.x16StrFormat, memory.addressStart ) ).
+                    AppendColumn(string.Format(cacheSnapshot.x16StrFormat,memory.addressEnd) ).
+                    AppendColumn(memory.memorySize).AppendColumn(memory.relatedObject.GetType().Name);
+                csvGenerator.NextRow();
+                ++idx;
+            }
+
+            System.IO.File.WriteAllText(origin + "-memoryImage.csv", csvGenerator.ToString());
+        }
+
+
 
 
     }

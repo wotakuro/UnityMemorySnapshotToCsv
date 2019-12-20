@@ -1,7 +1,7 @@
 ﻿using UnityEditor;
 using UnityEngine;
 
-namespace UTJ
+namespace UTJ.MemoryProfilerToCsv
 {
     public class MemorySnapshotToCsvWindow : EditorWindow
     {
@@ -22,7 +22,7 @@ namespace UTJ
             }
             if (GUILayout.Button("Exec") )
             {
-                UTJ.MemorySnapshotToCsv obj = new UTJ.MemorySnapshotToCsv(memoryFile);
+                MemorySnapshotToCsv obj = new MemorySnapshotToCsv(memoryFile);
                 EditorUtility.DisplayDialog("CSV Complete", System.IO.Directory.GetCurrentDirectory(), "OK");
             }
         }

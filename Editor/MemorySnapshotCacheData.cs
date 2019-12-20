@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 
 using UnityEditor.Profiling.Memory;
 using UnityEditor.Profiling.Memory.Experimental;
 
 
-namespace UTJ
+namespace UTJ.MemoryProfilerToCsv
 {
 
     public class MemorySnapshotCacheData
