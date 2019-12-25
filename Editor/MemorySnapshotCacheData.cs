@@ -68,6 +68,14 @@ namespace UTJ.MemoryProfilerToCsv
             public int size;
             public ulong typeInfoAddress;
             public int typeIndex;
+
+            public bool IsArray
+            {
+                get
+                {
+                    return ((flags & TypeFlags.kArray) != 0);
+                }
+            }
         }
         internal class ManagedFieldInfo
         {
@@ -81,11 +89,37 @@ namespace UTJ.MemoryProfilerToCsv
         {
             public ulong startAddress;
             public byte[] bytes;
+
+            public int ReadInt(int offset)
+            {
+                return BitConverter.ToInt32(this.bytes, offset);
+            }
+            public uint ReadUInt(int offset)
+            {
+                return BitConverter.ToUInt32(this.bytes, offset);
+            }
+            public string ReadString(int offset)
+            {
+                int strLength = this.ReadInt(offset);
+                return System.Text.Encoding.Default.GetString(bytes, offset + sizeof(int), strLength * 2);
+            }
+
         }
 
         internal class GcHandle
         {
             public ulong address;
+        }
+
+
+        internal class ManagedObjectInfo
+        {
+            public ManagedType typeInfo;
+            public ulong address;
+            public ManagedMemory memoryBlock;
+            public int offset;
+            public bool isArray;
+            public int arrayLength;
         }
 
         internal List<NativeTypeName> nativeTypes;
@@ -104,6 +138,8 @@ namespace UTJ.MemoryProfilerToCsv
         internal List<ManagedMemory> sortedManagedMemory;
         internal List<GcHandle> gcHandles;
 
+        internal Dictionary<ulong, ManagedObjectInfo> managedObjectByAddr;
+
         private string x16FormatCache = null;
 
         public string x16StrFormat
@@ -120,6 +156,7 @@ namespace UTJ.MemoryProfilerToCsv
 
         public MemorySnapshotCacheData(string filePath)
         {
+
             snapshot = PackedMemorySnapshot.Load(filePath);
 
             CreateNativeObjectType(snapshot.nativeTypes);
@@ -133,6 +170,9 @@ namespace UTJ.MemoryProfilerToCsv
             CreateManagedMemory(snapshot.managedStacks, ref managedStack);
             CreateSortedMangedMemoryList();
             CreateGCHandles(snapshot.gcHandles);
+
+            var managedObjectCrawler = new ManagedObjectCrawler(this);
+            this.managedObjectByAddr = managedObjectCrawler.Execute();
         }
 
         private void CreateNativeObjectType(NativeTypeEntries nativeTypeEntries)
@@ -442,22 +482,6 @@ namespace UTJ.MemoryProfilerToCsv
         }
 
 
-        internal ManagedType GetManagedTypeInfoFromAddr(ulong address,int depth = 0)
-        {
-            if(depth >1) { return null; }
-            var managedMemory = GetManagedMemory(address);
-            if (managedMemory == null) { return null; }
-
-            int offset = (int)(address - managedMemory.startAddress);
-            ulong newAddr = ReadPointer(managedMemory.bytes, offset);
-            ManagedType typeInfo = null;
-            if (managedTypeByAddr.TryGetValue(newAddr, out typeInfo))
-            {
-                return typeInfo;
-            }
-            return GetManagedTypeInfoFromAddr(newAddr, depth + 1) ;
-        }
-
 
         internal ManagedMemory GetManagedMemory(ulong addr)
         {
@@ -501,7 +525,7 @@ namespace UTJ.MemoryProfilerToCsv
             }
             return 0;
         }
-        private ulong ReadPointer(byte[] bytes,int offset)
+        internal ulong ReadPointer(byte[] bytes,int offset)
         {
             int pointerSize = snapshot.virtualMachineInformation.pointerSize;
             if (pointerSize == 4)
@@ -510,6 +534,20 @@ namespace UTJ.MemoryProfilerToCsv
                 return BitConverter.ToUInt64(bytes, offset);
             throw new ArgumentException("Unexpected pointer size: " + pointerSize);
         }
+
+        internal ulong ReadPointerByAddress(ulong addr, out ManagedMemory memory,out int offset)
+        {
+            memory = this.GetManagedMemory(addr);
+            if (memory == null)
+            {
+                offset = 0;
+                return 0;
+            }
+            offset = (int)(addr - memory.startAddress);
+            ulong newAddr = ReadPointer(memory.bytes, offset);
+            return newAddr;
+        }
+        
 
 
     }

@@ -182,29 +182,28 @@ namespace UTJ.MemoryProfilerToCsv
         private void SaveManagedObjectList(string origin)
         {
             CsvStringGenerator csvGenerator = new CsvStringGenerator();
-            csvGenerator.AppendColumn("address").AppendColumn("type");
+
             csvGenerator.NextRow();
-            foreach (var entry in cacheSnapshot.gcHandles)
+
+            foreach( var managedObject in this.cacheSnapshot.managedObjectByAddr.Values)
             {
-                var managedMemory = cacheSnapshot.GetManagedMemory(entry.address);
-                csvGenerator.AppendColumn(string.Format(cacheSnapshot.x16StrFormat, entry.address));
-                if( managedMemory != null)
+                int offset = managedObject.offset;
+                csvGenerator.AppendColumn(string.Format(cacheSnapshot.x16StrFormat, managedObject.address));
+                if (managedObject.typeInfo != null)
                 {
-                    var typeInfo = cacheSnapshot.GetManagedTypeInfoFromAddr(entry.address);
-                    if (typeInfo != null)
+                    csvGenerator.AppendColumn(managedObject.typeInfo.typeDescriptionName);
+                }
+                for (int i = 0; i < 30; ++i)
+                {
+                    try
                     {
-                        csvGenerator.AppendColumn(typeInfo.typeDescriptionName);
+                        csvGenerator.AppendColumn(managedObject.memoryBlock.ReadInt(offset + i * 4));
+                    }catch(System.Exception e)
+                    {
+
                     }
                 }
                 csvGenerator.NextRow();
-            }
-
-            // get From static field
-            foreach(var entry in cacheSnapshot.managedTypes)
-            {
-                int idx = entry.typeIndex;
-                if(cacheSnapshot.managedTypeByTypeIndex[idx].fieldIndices == null){ continue; }
-//                managedTypeByTypeIndex[idx].staticFieldBytes;
             }
 
             System.IO.File.WriteAllText(origin + "-managedObjects.csv", csvGenerator.ToString());
