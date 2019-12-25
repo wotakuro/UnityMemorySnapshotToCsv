@@ -136,7 +136,7 @@ namespace UTJ.MemoryProfilerToCsv
             csvGenerator.AppendColumn("assembly").
                 AppendColumn("typeName").
                 AppendColumn("size").
-                AppendColumn("staticFieldSize").AppendColumn("").AppendColumn("field");
+                AppendColumn("staticFieldSize").AppendColumn("flags").AppendColumn("").AppendColumn("field");
             csvGenerator.NextRow();
 
             int cnt = 0;
@@ -153,21 +153,24 @@ namespace UTJ.MemoryProfilerToCsv
                 {
                     csvGenerator.AppendColumn("");
                 }
+                csvGenerator.AppendColumn(entry.flags.ToString());
+
                 // fields
                 csvGenerator.AppendColumn("");
-                if (entry.fieldIndices != null)
+                if (entry.staticFieldInfos != null)
                 {
-                    for (int i = 0; i < entry.fieldIndices.Length; ++i)
+                    foreach(var staticFiled in entry.staticFieldInfos)
                     {
-                        var field = cacheSnapshot.managedFieldInfos[entry.fieldIndices[i]];
-                        if (field.isStatic)
-                        {
-                            csvGenerator.AppendColumn("static " + cacheSnapshot.managedTypeByTypeIndex[field.typeIndex].typeDescriptionName);
-                        }
-                        else
-                        {
-                            csvGenerator.AppendColumn(cacheSnapshot.managedTypeByTypeIndex[field.typeIndex].typeDescriptionName);
-                        }
+                        csvGenerator.AppendColumn("static " + staticFiled.fieldType.typeDescriptionName);
+                        csvGenerator.AppendColumn(staticFiled.fieldDescriptionName);
+                        csvGenerator.AppendColumn(staticFiled.offset);
+                    }
+                }
+                if( entry.instanceFieldInfos != null)
+                {
+                    foreach( var field in entry.instanceFieldInfos)
+                    {
+                        csvGenerator.AppendColumn(field.fieldType.typeDescriptionName);
                         csvGenerator.AppendColumn(field.fieldDescriptionName);
                         csvGenerator.AppendColumn(field.offset);
                     }
@@ -187,21 +190,12 @@ namespace UTJ.MemoryProfilerToCsv
 
             foreach( var managedObject in this.cacheSnapshot.managedObjectByAddr.Values)
             {
+                if(managedObject.address == 0) { continue; }
                 int offset = managedObject.offset;
                 csvGenerator.AppendColumn(string.Format(cacheSnapshot.x16StrFormat, managedObject.address));
                 if (managedObject.typeInfo != null)
                 {
                     csvGenerator.AppendColumn(managedObject.typeInfo.typeDescriptionName);
-                }
-                for (int i = 0; i < 30; ++i)
-                {
-                    try
-                    {
-                        csvGenerator.AppendColumn(managedObject.memoryBlock.ReadInt(offset + i * 4));
-                    }catch(System.Exception e)
-                    {
-
-                    }
                 }
                 csvGenerator.NextRow();
             }

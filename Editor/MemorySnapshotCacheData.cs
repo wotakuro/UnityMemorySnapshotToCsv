@@ -69,6 +69,9 @@ namespace UTJ.MemoryProfilerToCsv
             public ulong typeInfoAddress;
             public int typeIndex;
 
+            public List<ManagedFieldInfo> instanceFieldInfos;
+            public List<ManagedFieldInfo> staticFieldInfos;
+
             public bool IsArray
             {
                 get
@@ -83,6 +86,8 @@ namespace UTJ.MemoryProfilerToCsv
             public int offset;
             public int typeIndex;
             public bool isStatic;
+
+            public ManagedType fieldType;
         }
 
         internal class ManagedMemory
@@ -129,6 +134,7 @@ namespace UTJ.MemoryProfilerToCsv
         internal List<MemoryRegion> memoryRegions;
         internal List<ManagedType> managedTypes;
         internal List<ManagedFieldInfo> managedFieldInfos;
+
         internal Dictionary<ulong, ManagedType> managedTypeByAddr;
         internal Dictionary<int, ManagedType> managedTypeByTypeIndex;
 
@@ -156,7 +162,6 @@ namespace UTJ.MemoryProfilerToCsv
 
         public MemorySnapshotCacheData(string filePath)
         {
-
             snapshot = PackedMemorySnapshot.Load(filePath);
 
             CreateNativeObjectType(snapshot.nativeTypes);
@@ -166,10 +171,13 @@ namespace UTJ.MemoryProfilerToCsv
             CreateMemoryRegion(snapshot.nativeMemoryRegions);
             CreateManagedTypes(snapshot.typeDescriptions);
             CreateManagedFieldInfos(snapshot.fieldDescriptions);
+            ResolveManagedFieldType();
+
             CreateManagedMemory(snapshot.managedHeapSections, ref managedHeap);
             CreateManagedMemory(snapshot.managedStacks, ref managedStack);
             CreateSortedMangedMemoryList();
             CreateGCHandles(snapshot.gcHandles);
+
 
             var managedObjectCrawler = new ManagedObjectCrawler(this);
             this.managedObjectByAddr = managedObjectCrawler.Execute();
@@ -418,6 +426,33 @@ namespace UTJ.MemoryProfilerToCsv
                 this.managedFieldInfos.Add(entry);
             }
         }
+        private void ResolveManagedFieldType()
+        {
+            foreach ( var fieldInfo in this.managedFieldInfos)
+            {
+                var managedType = this.managedTypeByTypeIndex[fieldInfo.typeIndex];
+                fieldInfo.fieldType = managedType;
+            }
+            foreach( var typeInfo in this.managedTypes)
+            {
+                if(typeInfo.fieldIndices == null) { continue; }
+                typeInfo.instanceFieldInfos = new List<ManagedFieldInfo>();
+                typeInfo.staticFieldInfos = new List<ManagedFieldInfo>();
+
+                foreach (var index in typeInfo.fieldIndices) {
+                    var fieldInfo = this.managedFieldInfos[index];
+                    if (fieldInfo.isStatic)
+                    {
+                        typeInfo.staticFieldInfos.Add(fieldInfo);
+                    }
+                    else
+                    {
+                        typeInfo.instanceFieldInfos.Add(fieldInfo);
+                    }
+                 }
+            }
+        }
+        
 
         private void CreateManagedMemory(ManagedMemorySectionEntries managedMemorySection,ref List<ManagedMemory> managedMemories)
         {
