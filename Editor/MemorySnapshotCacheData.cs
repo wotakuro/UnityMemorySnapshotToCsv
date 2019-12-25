@@ -79,6 +79,13 @@ namespace UTJ.MemoryProfilerToCsv
                     return ((flags & TypeFlags.kArray) != 0);
                 }
             }
+            public bool IsValue
+            {
+                get
+                {
+                    return ((flags & TypeFlags.kValueType) != 0);
+                }
+            }
         }
         internal class ManagedFieldInfo
         {
@@ -88,6 +95,7 @@ namespace UTJ.MemoryProfilerToCsv
             public bool isStatic;
 
             public ManagedType fieldType;
+
         }
 
         internal class ManagedMemory
@@ -125,6 +133,15 @@ namespace UTJ.MemoryProfilerToCsv
             public int offset;
             public bool isArray;
             public int arrayLength;
+
+            public int GetHeaderSize(MemorySnapshotCacheData cacheData)
+            {
+                if (isArray)
+                {
+                    return cacheData.snapshot.virtualMachineInformation.arrayHeaderSize;
+                }
+                return cacheData.snapshot.virtualMachineInformation.objectHeaderSize;
+            }
         }
 
         internal List<NativeTypeName> nativeTypes;
@@ -148,7 +165,7 @@ namespace UTJ.MemoryProfilerToCsv
 
         private string x16FormatCache = null;
 
-        public string x16StrFormat
+        private string x16StrFormat
         {
             get
             {
@@ -158,6 +175,11 @@ namespace UTJ.MemoryProfilerToCsv
                 }
                 return x16FormatCache;
             }
+        }
+
+        public string GetAddressStr(ulong addr)
+        {
+            return string.Format(x16StrFormat, addr);
         }
 
         public MemorySnapshotCacheData(string filePath)
@@ -568,6 +590,30 @@ namespace UTJ.MemoryProfilerToCsv
             if (pointerSize == 8)
                 return BitConverter.ToUInt64(bytes, offset);
             throw new ArgumentException("Unexpected pointer size: " + pointerSize);
+        }
+        internal int ReadArraySize(byte[] bytes,int offset)
+        {
+            offset += snapshot.virtualMachineInformation.arrayBoundsOffsetInHeader;
+            var bounds = ReadPointer(bytes, offset);
+            if( bounds == 0)
+            {
+                offset += snapshot.virtualMachineInformation.arrayBoundsOffsetInHeader;
+                return BitConverter.ToInt32(bytes, offset);
+            }
+            /*
+             * 
+             * 
+            var cursor = heap.Find(bounds, virtualMachineInformation);
+            int length = 1;
+            int rank = data.typeDescriptions.GetRank(iTypeDescriptionArrayType);
+            for (int i = 0; i != rank; i++)
+            {
+                length *= cursor.ReadInt32();
+                cursor = cursor.Add(8);
+            }
+            return length;
+             */
+            return 0;
         }
 
         internal ulong ReadPointerByAddress(ulong addr, out ManagedMemory memory,out int offset)
