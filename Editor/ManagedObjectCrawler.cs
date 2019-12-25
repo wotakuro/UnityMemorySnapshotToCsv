@@ -7,9 +7,14 @@ namespace UTJ.MemoryProfilerToCsv
 {
     internal class ManagedObjectCrawler 
     {
-        private Dictionary<ulong, ManagedObjectInfo> managedObjectByAddr;
+        struct SearchInfo
+        {
+            public ulong address;
+        }
 
+        private Dictionary<ulong, ManagedObjectInfo> managedObjectByAddr;
         private MemorySnapshotCacheData cacheSnapshot;
+        private Stack<SearchInfo> searchStack;
 
         public ManagedObjectCrawler(MemorySnapshotCacheData cacheData)
         {
@@ -19,6 +24,7 @@ namespace UTJ.MemoryProfilerToCsv
         internal Dictionary<ulong,ManagedObjectInfo> Execute()
         {
             managedObjectByAddr = new Dictionary<ulong, ManagedObjectInfo>();
+            searchStack = new Stack<SearchInfo>();
             SetupFromGcHandle();
             SetupStaticField();
 
