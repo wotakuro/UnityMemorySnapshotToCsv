@@ -9,7 +9,7 @@ namespace UTJ.MemoryProfilerToCsv
     {
         struct SearchInfo
         {
-            public ulong address;
+            public ManagedObjectInfo managedObject;
         }
 
         private Dictionary<ulong, ManagedObjectInfo> managedObjectByAddr;
@@ -23,8 +23,8 @@ namespace UTJ.MemoryProfilerToCsv
 
         internal Dictionary<ulong,ManagedObjectInfo> Execute()
         {
-            managedObjectByAddr = new Dictionary<ulong, ManagedObjectInfo>();
-            searchStack = new Stack<SearchInfo>();
+            this.managedObjectByAddr = new Dictionary<ulong, ManagedObjectInfo>();
+            this.searchStack = new Stack<SearchInfo>();
             SetupFromGcHandle();
             SetupStaticField();
 
@@ -71,6 +71,10 @@ namespace UTJ.MemoryProfilerToCsv
                 return false;
             }
             this.managedObjectByAddr.Add(obj.address, obj);
+
+            var stackItem = new SearchInfo();
+            stackItem.managedObject = obj;
+            this.searchStack.Push(stackItem);
             return true;
         }
 
