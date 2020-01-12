@@ -12,19 +12,18 @@ namespace UTJ.MemoryProfilerToCsv
         {
             cacheSnapshot = new MemorySnapshotCacheData(filePath);
             
-            Save(System.IO.Path.GetFileName(filePath));                        
+//            Save(System.IO.Path.GetFileName(filePath));                        
         }
         
-        private void Save(string originFile)
+        public void Save(string savePath)
         {
-            var str = originFile.Remove(originFile.Length - 5);
-            SaveNativeObjects(str);
-            SaveNativeAllocation(str);
-            SaveManagedAllocations(str);
-            SaveManagedTypeList(str);
-            SaveManagedObjectList(str);
+            SaveNativeObjects(savePath);
+            SaveNativeAllocation(savePath);
+            SaveManagedAllocations(savePath);
+            SaveManagedTypeList(savePath);
+            SaveManagedObjectList(savePath);
 
-            SaveMergedMemoryImageInfo(str);
+            SaveMergedMemoryImageInfo(savePath);
         }
 
 

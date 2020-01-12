@@ -1,0 +1,16 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <ui:Label text="NewFile" name="Title">
+        <Style src="MemoryToCsv.uss" />
+    </ui:Label>
+    <ui:Button text="OpenFile" name="NewFile" style="width: 85.66666px;">
+        <Style src="MemoryToCsv.uss" />
+    </ui:Button>
+    <ui:VisualElement style="flex-direction: row; height: 36.6px; margin-top: 10px;">
+        <Style src="MemoryToCsv.uss" />
+        <ui:Label text="MemorySnap" name="Title" />
+        <ui:Button text="Reflesh" name="RefleshBtn" style="flex-direction: column; align-items: auto; right: 2%; position: absolute;" />
+    </ui:VisualElement>
+    <ui:ScrollView name="SnapList">
+        <Style src="MemoryToCsv.uss" />
+    </ui:ScrollView>
+</ui:UXML>
