@@ -7,23 +7,42 @@ namespace UTJ.MemoryProfilerToCsv
     public class MemorySnapshotToCsv
     {
         private MemorySnapshotCacheData cacheSnapshot;
-        
-        public MemorySnapshotToCsv(string filePath)
+        private System.Action<float> progressCallback;
+
+
+        public MemorySnapshotToCsv(string filePath,System.Action<float> pCallback)
         {
-            cacheSnapshot = new MemorySnapshotCacheData(filePath);
-            
-//            Save(System.IO.Path.GetFileName(filePath));                        
+            this.progressCallback = pCallback;
+            cacheSnapshot = new MemorySnapshotCacheData(filePath, progressCallback);
         }
         
         public void Save(string savePath)
         {
+            string dir = System.IO.Path.GetDirectoryName(savePath);
+            if (!System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+            MemorySnapshotToCsv.Progress(51,this.progressCallback);
             SaveNativeObjects(savePath);
+            MemorySnapshotToCsv.Progress(58, this.progressCallback);
             SaveNativeAllocation(savePath);
+            MemorySnapshotToCsv.Progress(67, this.progressCallback);
             SaveManagedAllocations(savePath);
+            MemorySnapshotToCsv.Progress(75, this.progressCallback);
             SaveManagedTypeList(savePath);
+            MemorySnapshotToCsv.Progress(84, this.progressCallback);
             SaveManagedObjectList(savePath);
-
+            MemorySnapshotToCsv.Progress(90, this.progressCallback);
             SaveMergedMemoryImageInfo(savePath);
+            MemorySnapshotToCsv.Progress(100, this.progressCallback);
+        }
+        public static void Progress(float progress, System.Action<float> progressCallback)
+        {
+            if (progressCallback != null)
+            {
+                progressCallback(progress);
+            }
         }
 
 

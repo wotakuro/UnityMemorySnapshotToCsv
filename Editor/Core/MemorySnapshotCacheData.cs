@@ -154,26 +154,37 @@ namespace UTJ.MemoryProfilerToCsv
             }
         }
 
-        public MemorySnapshotCacheData(string filePath)
+        public MemorySnapshotCacheData(string filePath, System.Action<float> progressCallback)
         {
-
             snapshot = PackedMemorySnapshot.Load(filePath);
-
+            MemorySnapshotToCsv.Progress(10,progressCallback);
             CreateNativeObjectType(snapshot.nativeTypes);
+            MemorySnapshotToCsv.Progress(12, progressCallback);
             CreateNativeObjects(snapshot.nativeObjects);
+            MemorySnapshotToCsv.Progress(14, progressCallback);
             CreateNativeAllocation(snapshot.nativeAllocations);
+            MemorySnapshotToCsv.Progress(16, progressCallback);
             CreateRootReferences(snapshot.nativeRootReferences);
+            MemorySnapshotToCsv.Progress(18, progressCallback);
             CreateMemoryRegion(snapshot.nativeMemoryRegions);
+            MemorySnapshotToCsv.Progress(20, progressCallback);
             CreateManagedTypes(snapshot.typeDescriptions);
+            MemorySnapshotToCsv.Progress(24, progressCallback);
             CreateManagedFieldInfos(snapshot.fieldDescriptions);
+            MemorySnapshotToCsv.Progress(26, progressCallback);
             CreateManagedMemory(snapshot.managedHeapSections, ref managedHeap);
             CreateManagedMemory(snapshot.managedStacks, ref managedStack);
+
+            MemorySnapshotToCsv.Progress(30, progressCallback);
             CreateSortedMangedMemoryList();
             CreateGCHandles(snapshot.gcHandles);
 
+            MemorySnapshotToCsv.Progress(35, progressCallback);
             var managedObjectCrawler = new ManagedObjectCrawler(this);
             this.managedObjectByAddr = managedObjectCrawler.Execute();
+            MemorySnapshotToCsv.Progress(50, progressCallback);
         }
+
 
         private void CreateNativeObjectType(NativeTypeEntries nativeTypeEntries)
         {

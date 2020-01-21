@@ -1,13 +1,19 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
-    <ui:Label text="NewFile" name="Title">
+    <ui:VisualElement>
         <Style src="MemoryToCsv.uss" />
-    </ui:Label>
-    <ui:Button text="OpenFile" name="NewFile" style="width: 85.66666px;">
+        <ui:Label text="Memory Snapshot to csv" name="Title" />
+        <ui:Button text="Open Results" name="OpenResultDir" style="position: absolute; top: 0.2px; right: 3.8px; width: 95.4px;" />
+    </ui:VisualElement>
+    <ui:VisualElement name="NewFileArea" style="flex-direction: row; margin-left: 5px; margin-top: 5px; margin-bottom: 5px;">
         <Style src="MemoryToCsv.uss" />
-    </ui:Button>
+        <ui:Button text="Parse NewFile" name="NewFile" style="width: 270px; flex-direction: column;" />
+        <ui:Label name="Execute" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; visibility: hidden;">
+            <uie:ProgressBar title="Convert to csv" name="ProgressBar" />
+        </ui:Label>
+    </ui:VisualElement>
     <ui:VisualElement style="flex-direction: row; height: 36.6px; margin-top: 10px;">
         <Style src="MemoryToCsv.uss" />
-        <ui:Label text="MemorySnap" name="Title" />
+        <ui:Label text="MemorySnapshots" name="Title" />
         <ui:Button text="Reflesh" name="RefleshBtn" style="flex-direction: column; align-items: auto; right: 2%; position: absolute;" />
     </ui:VisualElement>
     <ui:ScrollView name="SnapList">

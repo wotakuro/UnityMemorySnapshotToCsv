@@ -5,6 +5,7 @@ using System.IO;
 using System;
 using UnityEngine.Profiling.Memory;
 using UnityEngine.Profiling.Memory.Experimental;
+using System.Threading.Tasks;
 
 #if UNITY_2019_1_OR_NEWER
 using UnityEngine.UIElements;
@@ -23,11 +24,16 @@ namespace UTJ.MemoryProfilerToCsv
             public SnapInfo(string file)
             {
                 this.filePath = file;
+                string pngPath = file.Replace(".snap", ".png");
+                if( System.IO.File.Exists(pngPath) ){
+                    this.texture = new Texture2D(8,8);
+                    ImageConversion.LoadImage(this.texture, System.IO.File.ReadAllBytes(pngPath));
+                }
             }
         }
-        private static string memoryFile = "";
+        private const string GeneratedCsvDir = "MemorySnapshotCsv/";
 
-        List<SnapInfo> infoList;
+        private List<SnapInfo> infoList;
 
 
         [MenuItem("Tools/MemoryCsv")]
@@ -35,7 +41,6 @@ namespace UTJ.MemoryProfilerToCsv
         {
             EditorWindow.GetWindow<MemorySnapshotToCsvWindow>();
         }
-#if UNITY_2019_1_OR_NEWER
 
         private VisualTreeAsset itemTreeAsset;
 
@@ -52,8 +57,8 @@ namespace UTJ.MemoryProfilerToCsv
             this.rootVisualElement.Q<Button>("RefleshBtn").clicked += this.Reflesh;
             this.rootVisualElement.Q<Button>("NewFile").clicked += () =>
             {
-                memoryFile = EditorUtility.OpenFilePanel("SelectSnapShot", "", "snap");
-                OpenFile(memoryFile);
+                string memoryFile = EditorUtility.OpenFilePanel("SelectSnapShot", "", "snap");
+                var task = OpenFile(memoryFile, this.rootVisualElement.Q<VisualElement>("NewFileArea").Q<VisualElement>("Execute"));
             };
             this.Reflesh();
         }
@@ -84,38 +89,48 @@ namespace UTJ.MemoryProfilerToCsv
 
             item.Q<Button>("Open").clicked += () =>
             {
-                OpenFile(info.filePath);
+                var executeVisualElement = item.Q<VisualElement>("Execute");
+
+                var task = OpenFile(info.filePath, executeVisualElement);
             };
         }
-        private void OpenFile(string path)
+        
+
+
+        private async Task OpenFile(string path,VisualElement executeVisualElement )
         {
-            MemorySnapshotToCsv obj = new MemorySnapshotToCsv(path);
-            obj.Save(path);
-            // System.IO.Directory.GetCurrentDirectory()
-            string outputDir = path;
-            EditorUtility.DisplayDialog("CSV Complete", outputDir, "OK");
-            EditorUtility.RevealInFinder(outputDir);
-
-        }
+            executeVisualElement.visible = true;
+            IProgress<float> progress = new Progress<float>( (p)=>
+            {
+                executeVisualElement.Q<UnityEditor.UIElements.ProgressBar>("ProgressBar").value = p;
+            });
+            await Task.Run(() =>
+            {
+                var parser = new MemorySnapshotToCsv(path, (p)=> { progress.Report(p); });
+                parser.Save(GetNewPath(path));
+                progress.Report(100f);
+            });
+            executeVisualElement.visible = false;
+            string openPath = GetNewPath(path) + "-nativeObjects.csv";
+#if UNITY_EDITOR_WIN
+//            openPath = Path.Combine(Directory.GetCurrentDirectory(), GetNewPath(path) + "nativeObjects.csv");
+            EditorUtility.RevealInFinder(openPath);
 #endif
+#if UNITY_EDITOR_MAC
+            EditorUtility.RevealInFinder(openPath);
+#endif
+        }
 
-#if !UNITY_2019_1_OR_NEWER
-        private void OnGUI()
+        private void WatchExecute()
         {
-            EditorGUILayout.LabelField("file:" + memoryFile);
-            if (GUILayout.Button("File"))
-            {
-                memoryFile = EditorUtility.OpenFilePanel("SelectSnapShot", "", "snap");
-            }
-            if (GUILayout.Button("Exec") )
-            {
-                MemorySnapshotToCsv obj = new MemorySnapshotToCsv(memoryFile);
-                obj.Save(memoryFile);
-                EditorUtility.DisplayDialog("CSV Complete", System.IO.Directory.GetCurrentDirectory(), "OK");
-            }
         }
-#endif
 
+        private static string GetNewPath(string path)
+        {
+            string newPath = GeneratedCsvDir + System.IO.Path.GetFileNameWithoutExtension(path) + "/result";
+            return newPath;
+        }
+        
         private void RefleshList()
         {
             this.infoList = ScanMemorysanpshotFiles("MemoryCaptures");
