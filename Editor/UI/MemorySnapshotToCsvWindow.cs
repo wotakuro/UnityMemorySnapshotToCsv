@@ -55,6 +55,7 @@ namespace UTJ.MemoryProfilerToCsv
             this.itemTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(itemElemeFile);
 
             this.rootVisualElement.Q<Button>("RefleshBtn").clicked += this.Reflesh;
+            this.rootVisualElement.Q<Button>("OpenResultDir").clicked += this.OpenResultsDir;
             this.rootVisualElement.Q<Button>("NewFile").clicked += () =>
             {
                 string memoryFile = EditorUtility.OpenFilePanel("SelectSnapShot", "", "snap");
@@ -113,16 +114,25 @@ namespace UTJ.MemoryProfilerToCsv
             executeVisualElement.visible = false;
             string openPath = GetNewPath(path) + "-nativeObjects.csv";
 #if UNITY_EDITOR_WIN
-//            openPath = Path.Combine(Directory.GetCurrentDirectory(), GetNewPath(path) + "nativeObjects.csv");
             EditorUtility.RevealInFinder(openPath);
 #endif
 #if UNITY_EDITOR_MAC
             EditorUtility.RevealInFinder(openPath);
 #endif
         }
-
-        private void WatchExecute()
+        
+        private void OpenResultsDir()
         {
+            var resultDirs = Directory.GetDirectories(GeneratedCsvDir);
+            if (resultDirs != null && resultDirs.Length > 0)
+            {
+                EditorUtility.RevealInFinder(resultDirs[0]);
+
+            }
+            else
+            {
+                EditorUtility.RevealInFinder(GeneratedCsvDir);
+            }
         }
 
         private static string GetNewPath(string path)
