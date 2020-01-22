@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
-    <ui:VisualElement style="flex-wrap: no-wrap; flex-direction: row; justify-content: flex-start; align-items: stretch; -unity-background-scale-mode: scale-and-crop; display: flex; white-space: flex; height: 141.2px;">
+    <ui:VisualElement style="flex-wrap: no-wrap; flex-direction: row; justify-content: flex-start; align-items: stretch; -unity-background-scale-mode: scale-and-crop; display: flex; height: 141.2px;">
         <Style src="MemoryToCsv.uss" />
         <ui:VisualElement name="Left" style="background-image: none; height: 128px; width: 256px; display: flex; -unity-background-image-tint-color: rgb(255, 255, 255); background-color: rgb(255, 255, 255); margin-left: 5px; margin-right: 5px; margin-top: 5px;" />
         <ui:VisualElement name="Right" style="width: 245px; margin-top: 5px;">
