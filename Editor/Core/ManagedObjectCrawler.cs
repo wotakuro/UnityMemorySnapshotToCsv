@@ -7,9 +7,14 @@ namespace UTJ.MemoryProfilerToCsv
 {
     internal class ManagedObjectCrawler 
     {
-        private Dictionary<ulong, ManagedObjectInfo> managedObjectByAddr;
+        struct SearchInfo
+        {
+            public ManagedObjectInfo managedObject;
+        }
 
+        private Dictionary<ulong, ManagedObjectInfo> managedObjectByAddr;
         private MemorySnapshotCacheData cacheSnapshot;
+        private Stack<SearchInfo> searchStack;
 
         public ManagedObjectCrawler(MemorySnapshotCacheData cacheData)
         {
@@ -18,8 +23,10 @@ namespace UTJ.MemoryProfilerToCsv
 
         internal Dictionary<ulong,ManagedObjectInfo> Execute()
         {
-            managedObjectByAddr = new Dictionary<ulong, ManagedObjectInfo>();
+            this.managedObjectByAddr = new Dictionary<ulong, ManagedObjectInfo>();
+            this.searchStack = new Stack<SearchInfo>();
             SetupFromGcHandle();
+            SetupStaticField();
 
             return managedObjectByAddr;
         }
@@ -33,21 +40,41 @@ namespace UTJ.MemoryProfilerToCsv
                 if (managedMemory != null)
                 {
                     var managedObjectInfo = GetManagedObjectInfoFromAddr(entry.address);
-                    if (managedObjectInfo != null)
-                    {
-                        AddManagedObject(managedObjectInfo);
-                    }
+                    AddManagedObject(managedObjectInfo);
+                }
+            }
+        }
+        private void SetupStaticField()
+        {
+            foreach( var type in cacheSnapshot.managedTypes)
+            {
+                if( type.staticFieldBytes == null || type.staticFieldInfos == null) { continue; }
+                if( type.staticFieldBytes.Length == 0) { continue; }
+
+                foreach (var field in type.staticFieldInfos)
+                {
+                    bool isValue = ((field.fieldType.flags & UnityEditor.Profiling.Memory.Experimental.TypeFlags.kValueType) != 0);
+                    if (isValue) { continue; }
+                    if (field.offset < 0) { continue; }
+                    var addr = cacheSnapshot.ReadPointer(type.staticFieldBytes, field.offset);
+                    var obj = GetManagedObjectInfoFromAddr(addr);
+                    this.AddManagedObject(obj);
                 }
             }
         }
 
         private bool AddManagedObject(ManagedObjectInfo obj)
         {
+            if( obj == null) { return false; }
             if(this.managedObjectByAddr.ContainsKey(obj.address))
             {
                 return false;
             }
             this.managedObjectByAddr.Add(obj.address, obj);
+
+            var stackItem = new SearchInfo();
+            stackItem.managedObject = obj;
+            this.searchStack.Push(stackItem);
             return true;
         }
 

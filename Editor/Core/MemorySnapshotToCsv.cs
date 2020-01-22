@@ -10,12 +10,12 @@ namespace UTJ.MemoryProfilerToCsv
         private System.Action<float> progressCallback;
 
 
-        public MemorySnapshotToCsv(string filePath,System.Action<float> pCallback)
+        public MemorySnapshotToCsv(string filePath,System.Action<float> pcallback)
         {
-            this.progressCallback = pCallback;
-            cacheSnapshot = new MemorySnapshotCacheData(filePath, progressCallback);
+            cacheSnapshot = new MemorySnapshotCacheData(filePath, pcallback);
+            this.progressCallback = pcallback;
         }
-        
+
         public void Save(string savePath)
         {
             string dir = System.IO.Path.GetDirectoryName(savePath);
@@ -23,26 +23,24 @@ namespace UTJ.MemoryProfilerToCsv
             {
                 System.IO.Directory.CreateDirectory(dir);
             }
-            MemorySnapshotToCsv.Progress(51,this.progressCallback);
+            MemorySnapshotToCsv.Progress(70.0f, this.progressCallback);
             SaveNativeObjects(savePath);
-            MemorySnapshotToCsv.Progress(58, this.progressCallback);
+            MemorySnapshotToCsv.Progress(75.0f, this.progressCallback);
             SaveNativeAllocation(savePath);
-            MemorySnapshotToCsv.Progress(67, this.progressCallback);
+            MemorySnapshotToCsv.Progress(80.0f, this.progressCallback);
             SaveManagedAllocations(savePath);
-            MemorySnapshotToCsv.Progress(75, this.progressCallback);
+            MemorySnapshotToCsv.Progress(85.0f, this.progressCallback);
             SaveManagedTypeList(savePath);
-            MemorySnapshotToCsv.Progress(84, this.progressCallback);
+            MemorySnapshotToCsv.Progress(90.0f, this.progressCallback);
             SaveManagedObjectList(savePath);
-            MemorySnapshotToCsv.Progress(90, this.progressCallback);
+            MemorySnapshotToCsv.Progress(95.0f, this.progressCallback);
             SaveMergedMemoryImageInfo(savePath);
-            MemorySnapshotToCsv.Progress(100, this.progressCallback);
+            MemorySnapshotToCsv.Progress(100.0f, this.progressCallback);
         }
-        public static void Progress(float progress, System.Action<float> progressCallback)
+
+        public static void Progress(float progress, System.Action<float> pcallback)
         {
-            if (progressCallback != null)
-            {
-                progressCallback(progress);
-            }
+            if(pcallback != null) { pcallback(progress); }
         }
 
 
@@ -54,7 +52,7 @@ namespace UTJ.MemoryProfilerToCsv
             csvGenerator.NextRow();
             foreach (var entry in cacheSnapshot.nativeObjects)
             {
-                csvGenerator.AppendColumn(string.Format(cacheSnapshot.x16StrFormat, entry.address));
+                csvGenerator.AppendColumn(cacheSnapshot.GetAddressStr( entry.address));
                 csvGenerator.AppendColumn(entry.size);
                 csvGenerator.AppendColumn(entry.objectName);
                 // type
@@ -73,6 +71,7 @@ namespace UTJ.MemoryProfilerToCsv
                 }
                 csvGenerator.NextRow();
             }
+
             System.IO.File.WriteAllText(origin + "-nativeObjects.csv", csvGenerator.ToString());
         }
         private void SaveNativeAllocation(string origin)
@@ -85,7 +84,7 @@ namespace UTJ.MemoryProfilerToCsv
             csvGenerator.NextRow();
             foreach (var entry in cacheSnapshot.nativeAllocations)
             {
-                csvGenerator.AppendColumn(string.Format(cacheSnapshot.x16StrFormat, entry.address));
+                csvGenerator.AppendColumn(cacheSnapshot.GetAddressStr( entry.address));
                 csvGenerator.AppendColumn(entry.size);
                 csvGenerator.AppendColumn(entry.overhead);
                 csvGenerator.AppendColumn(entry.paddingSize);
@@ -96,7 +95,7 @@ namespace UTJ.MemoryProfilerToCsv
                 region = cacheSnapshot.memoryRegions[entry.memoryRegionIndex];
                 if (region != null)
                 {
-                    csvGenerator.AppendColumn(region.memoryRegionName).AppendColumn(string.Format(cacheSnapshot.x16StrFormat, region.addressBase)).AppendColumn(region.addressSize);
+                    csvGenerator.AppendColumn(region.memoryRegionName).AppendColumn(cacheSnapshot.GetAddressStr(region.addressBase)).AppendColumn(region.addressSize);
                 }
                 else
                 {
@@ -128,13 +127,13 @@ namespace UTJ.MemoryProfilerToCsv
             foreach (var entry in cacheSnapshot.managedHeap)
             {
                 csvGenerator.AppendColumn("Heap").
-                    AppendColumn(string.Format(cacheSnapshot.x16StrFormat, entry.startAddress)).AppendColumn(entry.bytes.Length);
+                    AppendColumn(cacheSnapshot.GetAddressStr(entry.startAddress)).AppendColumn(entry.bytes.Length);
                 csvGenerator.NextRow();
             }
             foreach (var entry in cacheSnapshot.managedStack)
             {
                 csvGenerator.AppendColumn("Stack").
-                    AppendColumn(string.Format(cacheSnapshot.x16StrFormat, entry.startAddress)).AppendColumn(entry.bytes.Length);
+                    AppendColumn(cacheSnapshot.GetAddressStr(entry.startAddress)).AppendColumn(entry.bytes.Length);
                 csvGenerator.NextRow();
             }
             System.IO.File.WriteAllText(origin + "-managedAllocation.csv", csvGenerator.ToString());
@@ -154,7 +153,7 @@ namespace UTJ.MemoryProfilerToCsv
             csvGenerator.AppendColumn("assembly").
                 AppendColumn("typeName").
                 AppendColumn("size").
-                AppendColumn("staticFieldSize").AppendColumn("").AppendColumn("field");
+                AppendColumn("staticFieldSize").AppendColumn("flags").AppendColumn("").AppendColumn("field");
             csvGenerator.NextRow();
 
             int cnt = 0;
@@ -171,21 +170,24 @@ namespace UTJ.MemoryProfilerToCsv
                 {
                     csvGenerator.AppendColumn("");
                 }
+                csvGenerator.AppendColumn(entry.flags.ToString());
+
                 // fields
                 csvGenerator.AppendColumn("");
-                if (entry.fieldIndices != null)
+                if (entry.staticFieldInfos != null)
                 {
-                    for (int i = 0; i < entry.fieldIndices.Length; ++i)
+                    foreach(var staticFiled in entry.staticFieldInfos)
                     {
-                        var field = cacheSnapshot.managedFieldInfos[entry.fieldIndices[i]];
-                        if (field.isStatic)
-                        {
-                            csvGenerator.AppendColumn("static " + cacheSnapshot.managedTypeByTypeIndex[field.typeIndex].typeDescriptionName);
-                        }
-                        else
-                        {
-                            csvGenerator.AppendColumn(cacheSnapshot.managedTypeByTypeIndex[field.typeIndex].typeDescriptionName);
-                        }
+                        csvGenerator.AppendColumn("static " + staticFiled.fieldType.typeDescriptionName);
+                        csvGenerator.AppendColumn(staticFiled.fieldDescriptionName);
+                        csvGenerator.AppendColumn(staticFiled.offset);
+                    }
+                }
+                if( entry.instanceFieldInfos != null)
+                {
+                    foreach( var field in entry.instanceFieldInfos)
+                    {
+                        csvGenerator.AppendColumn(field.fieldType.typeDescriptionName);
                         csvGenerator.AppendColumn(field.fieldDescriptionName);
                         csvGenerator.AppendColumn(field.offset);
                     }
@@ -205,21 +207,12 @@ namespace UTJ.MemoryProfilerToCsv
 
             foreach( var managedObject in this.cacheSnapshot.managedObjectByAddr.Values)
             {
+                if(managedObject.address == 0) { continue; }
                 int offset = managedObject.offset;
-                csvGenerator.AppendColumn(string.Format(cacheSnapshot.x16StrFormat, managedObject.address));
+                csvGenerator.AppendColumn(cacheSnapshot.GetAddressStr(managedObject.address));
                 if (managedObject.typeInfo != null)
                 {
                     csvGenerator.AppendColumn(managedObject.typeInfo.typeDescriptionName);
-                }
-                for (int i = 0; i < 30; ++i)
-                {
-                    try
-                    {
-                        csvGenerator.AppendColumn(managedObject.memoryBlock.ReadInt(offset + i * 4));
-                    }catch(System.Exception e)
-                    {
-
-                    }
                 }
                 csvGenerator.NextRow();
             }
@@ -280,8 +273,8 @@ namespace UTJ.MemoryProfilerToCsv
                     lastEnd = memory.addressEnd;
                 }
 
-                csvGenerator.AppendColumn( string.Format(cacheSnapshot.x16StrFormat, memory.addressStart ) ).
-                    AppendColumn(string.Format(cacheSnapshot.x16StrFormat,memory.addressEnd) ).
+                csvGenerator.AppendColumn(cacheSnapshot.GetAddressStr(memory.addressStart ) ).
+                    AppendColumn(cacheSnapshot.GetAddressStr(memory.addressEnd) ).
                     AppendColumn(memory.memorySize).AppendColumn(memory.relatedObject.GetType().Name);
                 csvGenerator.NextRow();
                 ++idx;

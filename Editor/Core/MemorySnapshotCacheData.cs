@@ -69,11 +69,21 @@ namespace UTJ.MemoryProfilerToCsv
             public ulong typeInfoAddress;
             public int typeIndex;
 
+            public List<ManagedFieldInfo> instanceFieldInfos;
+            public List<ManagedFieldInfo> staticFieldInfos;
+
             public bool IsArray
             {
                 get
                 {
                     return ((flags & TypeFlags.kArray) != 0);
+                }
+            }
+            public bool IsValue
+            {
+                get
+                {
+                    return ((flags & TypeFlags.kValueType) != 0);
                 }
             }
         }
@@ -83,6 +93,9 @@ namespace UTJ.MemoryProfilerToCsv
             public int offset;
             public int typeIndex;
             public bool isStatic;
+
+            public ManagedType fieldType;
+
         }
 
         internal class ManagedMemory
@@ -120,6 +133,15 @@ namespace UTJ.MemoryProfilerToCsv
             public int offset;
             public bool isArray;
             public int arrayLength;
+
+            public int GetHeaderSize(MemorySnapshotCacheData cacheData)
+            {
+                if (isArray)
+                {
+                    return cacheData.snapshot.virtualMachineInformation.arrayHeaderSize;
+                }
+                return cacheData.snapshot.virtualMachineInformation.objectHeaderSize;
+            }
         }
 
         internal List<NativeTypeName> nativeTypes;
@@ -129,6 +151,7 @@ namespace UTJ.MemoryProfilerToCsv
         internal List<MemoryRegion> memoryRegions;
         internal List<ManagedType> managedTypes;
         internal List<ManagedFieldInfo> managedFieldInfos;
+
         internal Dictionary<ulong, ManagedType> managedTypeByAddr;
         internal Dictionary<int, ManagedType> managedTypeByTypeIndex;
 
@@ -142,7 +165,7 @@ namespace UTJ.MemoryProfilerToCsv
 
         private string x16FormatCache = null;
 
-        public string x16StrFormat
+        private string x16StrFormat
         {
             get
             {
@@ -154,37 +177,47 @@ namespace UTJ.MemoryProfilerToCsv
             }
         }
 
-        public MemorySnapshotCacheData(string filePath, System.Action<float> progressCallback)
+        public string GetAddressStr(ulong addr)
         {
-            snapshot = PackedMemorySnapshot.Load(filePath);
-            MemorySnapshotToCsv.Progress(10,progressCallback);
-            CreateNativeObjectType(snapshot.nativeTypes);
-            MemorySnapshotToCsv.Progress(12, progressCallback);
-            CreateNativeObjects(snapshot.nativeObjects);
-            MemorySnapshotToCsv.Progress(14, progressCallback);
-            CreateNativeAllocation(snapshot.nativeAllocations);
-            MemorySnapshotToCsv.Progress(16, progressCallback);
-            CreateRootReferences(snapshot.nativeRootReferences);
-            MemorySnapshotToCsv.Progress(18, progressCallback);
-            CreateMemoryRegion(snapshot.nativeMemoryRegions);
-            MemorySnapshotToCsv.Progress(20, progressCallback);
-            CreateManagedTypes(snapshot.typeDescriptions);
-            MemorySnapshotToCsv.Progress(24, progressCallback);
-            CreateManagedFieldInfos(snapshot.fieldDescriptions);
-            MemorySnapshotToCsv.Progress(26, progressCallback);
-            CreateManagedMemory(snapshot.managedHeapSections, ref managedHeap);
-            CreateManagedMemory(snapshot.managedStacks, ref managedStack);
-
-            MemorySnapshotToCsv.Progress(30, progressCallback);
-            CreateSortedMangedMemoryList();
-            CreateGCHandles(snapshot.gcHandles);
-
-            MemorySnapshotToCsv.Progress(35, progressCallback);
-            var managedObjectCrawler = new ManagedObjectCrawler(this);
-            this.managedObjectByAddr = managedObjectCrawler.Execute();
-            MemorySnapshotToCsv.Progress(50, progressCallback);
+            return string.Format(x16StrFormat, addr);
         }
 
+        public MemorySnapshotCacheData(string filePath, System.Action<float> pcallback)
+        {
+            MemorySnapshotToCsv.Progress(0.0f, pcallback);
+            snapshot = PackedMemorySnapshot.Load(filePath);
+            MemorySnapshotToCsv.Progress(5.0f, pcallback);
+
+            CreateNativeObjectType(snapshot.nativeTypes);
+            MemorySnapshotToCsv.Progress(8.0f, pcallback);
+            CreateNativeObjects(snapshot.nativeObjects);
+            MemorySnapshotToCsv.Progress(12.0f, pcallback);
+            CreateNativeAllocation(snapshot.nativeAllocations);
+            MemorySnapshotToCsv.Progress(16.0f, pcallback);
+            CreateRootReferences(snapshot.nativeRootReferences);
+            MemorySnapshotToCsv.Progress(20.0f, pcallback);
+            CreateMemoryRegion(snapshot.nativeMemoryRegions);
+            MemorySnapshotToCsv.Progress(24.0f, pcallback);
+            CreateManagedTypes(snapshot.typeDescriptions);
+            MemorySnapshotToCsv.Progress(28.0f, pcallback);
+            CreateManagedFieldInfos(snapshot.fieldDescriptions);
+            MemorySnapshotToCsv.Progress(32.0f, pcallback);
+            ResolveManagedFieldType();
+
+            MemorySnapshotToCsv.Progress(36.0f, pcallback);
+            CreateManagedMemory(snapshot.managedHeapSections, ref managedHeap);
+            MemorySnapshotToCsv.Progress(40.0f, pcallback);
+            CreateManagedMemory(snapshot.managedStacks, ref managedStack);
+            MemorySnapshotToCsv.Progress(44.0f, pcallback);
+            CreateSortedMangedMemoryList();
+            MemorySnapshotToCsv.Progress(48.0f, pcallback);
+            CreateGCHandles(snapshot.gcHandles);
+            MemorySnapshotToCsv.Progress(52.0f, pcallback);
+
+            var managedObjectCrawler = new ManagedObjectCrawler(this);
+            this.managedObjectByAddr = managedObjectCrawler.Execute();
+            MemorySnapshotToCsv.Progress(65.0f, pcallback);
+        }
 
         private void CreateNativeObjectType(NativeTypeEntries nativeTypeEntries)
         {
@@ -429,6 +462,33 @@ namespace UTJ.MemoryProfilerToCsv
                 this.managedFieldInfos.Add(entry);
             }
         }
+        private void ResolveManagedFieldType()
+        {
+            foreach ( var fieldInfo in this.managedFieldInfos)
+            {
+                var managedType = this.managedTypeByTypeIndex[fieldInfo.typeIndex];
+                fieldInfo.fieldType = managedType;
+            }
+            foreach( var typeInfo in this.managedTypes)
+            {
+                if(typeInfo.fieldIndices == null) { continue; }
+                typeInfo.instanceFieldInfos = new List<ManagedFieldInfo>();
+                typeInfo.staticFieldInfos = new List<ManagedFieldInfo>();
+
+                foreach (var index in typeInfo.fieldIndices) {
+                    var fieldInfo = this.managedFieldInfos[index];
+                    if (fieldInfo.isStatic)
+                    {
+                        typeInfo.staticFieldInfos.Add(fieldInfo);
+                    }
+                    else
+                    {
+                        typeInfo.instanceFieldInfos.Add(fieldInfo);
+                    }
+                 }
+            }
+        }
+        
 
         private void CreateManagedMemory(ManagedMemorySectionEntries managedMemorySection,ref List<ManagedMemory> managedMemories)
         {
@@ -544,6 +604,30 @@ namespace UTJ.MemoryProfilerToCsv
             if (pointerSize == 8)
                 return BitConverter.ToUInt64(bytes, offset);
             throw new ArgumentException("Unexpected pointer size: " + pointerSize);
+        }
+        internal int ReadArraySize(byte[] bytes,int offset)
+        {
+            offset += snapshot.virtualMachineInformation.arrayBoundsOffsetInHeader;
+            var bounds = ReadPointer(bytes, offset);
+            if( bounds == 0)
+            {
+                offset += snapshot.virtualMachineInformation.arrayBoundsOffsetInHeader;
+                return BitConverter.ToInt32(bytes, offset);
+            }
+            /*
+             * 
+             * 
+            var cursor = heap.Find(bounds, virtualMachineInformation);
+            int length = 1;
+            int rank = data.typeDescriptions.GetRank(iTypeDescriptionArrayType);
+            for (int i = 0; i != rank; i++)
+            {
+                length *= cursor.ReadInt32();
+                cursor = cursor.Add(8);
+            }
+            return length;
+             */
+            return 0;
         }
 
         internal ulong ReadPointerByAddress(ulong addr, out ManagedMemory memory,out int offset)
