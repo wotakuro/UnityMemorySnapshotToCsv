@@ -182,27 +182,41 @@ namespace UTJ.MemoryProfilerToCsv
             return string.Format(x16StrFormat, addr);
         }
 
-        public MemorySnapshotCacheData(string filePath)
+        public MemorySnapshotCacheData(string filePath, System.Action<float> pcallback)
         {
+            MemorySnapshotToCsv.Progress(0.0f, pcallback);
             snapshot = PackedMemorySnapshot.Load(filePath);
+            MemorySnapshotToCsv.Progress(5.0f, pcallback);
 
             CreateNativeObjectType(snapshot.nativeTypes);
+            MemorySnapshotToCsv.Progress(8.0f, pcallback);
             CreateNativeObjects(snapshot.nativeObjects);
+            MemorySnapshotToCsv.Progress(12.0f, pcallback);
             CreateNativeAllocation(snapshot.nativeAllocations);
+            MemorySnapshotToCsv.Progress(16.0f, pcallback);
             CreateRootReferences(snapshot.nativeRootReferences);
+            MemorySnapshotToCsv.Progress(20.0f, pcallback);
             CreateMemoryRegion(snapshot.nativeMemoryRegions);
+            MemorySnapshotToCsv.Progress(24.0f, pcallback);
             CreateManagedTypes(snapshot.typeDescriptions);
+            MemorySnapshotToCsv.Progress(28.0f, pcallback);
             CreateManagedFieldInfos(snapshot.fieldDescriptions);
+            MemorySnapshotToCsv.Progress(32.0f, pcallback);
             ResolveManagedFieldType();
 
+            MemorySnapshotToCsv.Progress(36.0f, pcallback);
             CreateManagedMemory(snapshot.managedHeapSections, ref managedHeap);
+            MemorySnapshotToCsv.Progress(40.0f, pcallback);
             CreateManagedMemory(snapshot.managedStacks, ref managedStack);
+            MemorySnapshotToCsv.Progress(44.0f, pcallback);
             CreateSortedMangedMemoryList();
+            MemorySnapshotToCsv.Progress(48.0f, pcallback);
             CreateGCHandles(snapshot.gcHandles);
-
+            MemorySnapshotToCsv.Progress(52.0f, pcallback);
 
             var managedObjectCrawler = new ManagedObjectCrawler(this);
             this.managedObjectByAddr = managedObjectCrawler.Execute();
+            MemorySnapshotToCsv.Progress(65.0f, pcallback);
         }
 
         private void CreateNativeObjectType(NativeTypeEntries nativeTypeEntries)

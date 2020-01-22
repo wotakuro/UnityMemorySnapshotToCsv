@@ -7,24 +7,40 @@ namespace UTJ.MemoryProfilerToCsv
     public class MemorySnapshotToCsv
     {
         private MemorySnapshotCacheData cacheSnapshot;
-        
-        public MemorySnapshotToCsv(string filePath)
-        {
-            cacheSnapshot = new MemorySnapshotCacheData(filePath);
-            
-            Save(System.IO.Path.GetFileName(filePath));                        
-        }
-        
-        private void Save(string originFile)
-        {
-            var str = originFile.Remove(originFile.Length - 5);
-            SaveNativeObjects(str);
-            SaveNativeAllocation(str);
-            SaveManagedAllocations(str);
-            SaveManagedTypeList(str);
-            SaveManagedObjectList(str);
+        private System.Action<float> progressCallback;
 
-            SaveMergedMemoryImageInfo(str);
+
+        public MemorySnapshotToCsv(string filePath,System.Action<float> pcallback)
+        {
+            cacheSnapshot = new MemorySnapshotCacheData(filePath, pcallback);
+            this.progressCallback = pcallback;
+        }
+
+        public void Save(string savePath)
+        {
+            string dir = System.IO.Path.GetDirectoryName(savePath);
+            if (!System.IO.Directory.Exists(dir))
+            {
+                System.IO.Directory.CreateDirectory(dir);
+            }
+            MemorySnapshotToCsv.Progress(70.0f, this.progressCallback);
+            SaveNativeObjects(savePath);
+            MemorySnapshotToCsv.Progress(75.0f, this.progressCallback);
+            SaveNativeAllocation(savePath);
+            MemorySnapshotToCsv.Progress(80.0f, this.progressCallback);
+            SaveManagedAllocations(savePath);
+            MemorySnapshotToCsv.Progress(85.0f, this.progressCallback);
+            SaveManagedTypeList(savePath);
+            MemorySnapshotToCsv.Progress(90.0f, this.progressCallback);
+            SaveManagedObjectList(savePath);
+            MemorySnapshotToCsv.Progress(95.0f, this.progressCallback);
+            SaveMergedMemoryImageInfo(savePath);
+            MemorySnapshotToCsv.Progress(100.0f, this.progressCallback);
+        }
+
+        public static void Progress(float progress, System.Action<float> pcallback)
+        {
+            if(pcallback != null) { pcallback(progress); }
         }
 
 
@@ -55,6 +71,7 @@ namespace UTJ.MemoryProfilerToCsv
                 }
                 csvGenerator.NextRow();
             }
+
             System.IO.File.WriteAllText(origin + "-nativeObjects.csv", csvGenerator.ToString());
         }
         private void SaveNativeAllocation(string origin)

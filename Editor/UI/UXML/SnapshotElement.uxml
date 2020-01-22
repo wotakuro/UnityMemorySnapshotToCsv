@@ -1,0 +1,15 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <ui:VisualElement style="flex-wrap: no-wrap; flex-direction: row; justify-content: flex-start; align-items: stretch; -unity-background-scale-mode: scale-and-crop; display: flex; height: 141.2px;">
+        <Style src="MemoryToCsv.uss" />
+        <ui:VisualElement name="Left" style="background-image: none; height: 128px; width: 256px; display: flex; -unity-background-image-tint-color: rgb(255, 255, 255); background-color: rgb(255, 255, 255); margin-left: 5px; margin-right: 5px; margin-top: 5px;" />
+        <ui:VisualElement name="Right" style="width: 245px; margin-top: 5px;">
+            <ui:Label text="File" name="Filename" />
+            <ui:Label text="Date" name="DateTime" />
+            <ui:Button text="Open" name="Open" style="align-items: stretch; flex-wrap: no-wrap; position: relative; width: 89px;" />
+            <ui:Label text="Platform" name="Platform" />
+        </ui:VisualElement>
+        <ui:Label name="Execute" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.72); visibility: hidden;">
+            <uie:ProgressBar title="Convert to csv" name="ProgressBar" high-value="100" style="top: 60px;" />
+        </ui:Label>
+    </ui:VisualElement>
+</ui:UXML>
