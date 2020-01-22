@@ -7,8 +7,12 @@ using UnityEngine.Profiling.Memory;
 using UnityEngine.Profiling.Memory.Experimental;
 using System.Threading.Tasks;
 
-#if UNITY_2019_1_OR_NEWER
+#if UNITY_2019_1_OR_NEWER || UNITY_2019_OR_NEWER
 using UnityEngine.UIElements;
+using UnityEditor.UIElements;
+#else
+using UnityEngine.Experimental.UIElements;
+using UnityEditor.Experimental.UIElements;
 #endif
 
 namespace UTJ.MemoryProfilerToCsv
@@ -44,8 +48,45 @@ namespace UTJ.MemoryProfilerToCsv
 
         private VisualTreeAsset itemTreeAsset;
 
+#if !UNITY_2019_1_OR_NEWER && !UNITY_2019_OR_NEWER
+        private VisualElement rootVisualElement{
+            get{
+                return this.GetRootVisualContainer();
+            }
+        }
+
+        private float lastHeight = -1.0f;
+        private void SetupScrollViewHeight()
+        {
+            if(lastHeight == this.position.height)
+            {
+                return;
+            }
+            var scrollView = this.rootVisualElement.Q<ScrollView>("SnapList");
+            scrollView.style.height = this.position.height - 120;
+            lastHeight = this.position.height;
+        }
+#endif
+
         private void OnEnable()
         {
+#if UNITY_2019_1_OR_NEWER || UNITY_2019_OR_NEWER
+            OnEnableUnity2019();
+#else
+            lastHeight = -1.0f;
+            OnEnableUnity2018();
+#endif
+        }
+
+        private void Update()
+        {
+#if !UNITY_2019_1_OR_NEWER && !UNITY_2019_OR_NEWER
+            SetupScrollViewHeight();
+#endif
+        }
+
+#if UNITY_2019_1_OR_NEWER || UNITY_2019_OR_NEWER
+        private void OnEnableUnity2019(){
             string path = "Packages/com.utj.memorysnapshot2csv/Editor/UI/UXML";
             string rootElemFile = System.IO.Path.Combine(path, "MemoryToCsv.uxml");
             VisualTreeAsset rootElem = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(rootElemFile);
@@ -54,15 +95,39 @@ namespace UTJ.MemoryProfilerToCsv
             string itemElemeFile = System.IO.Path.Combine(path, "SnapshotElement.uxml");
             this.itemTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(itemElemeFile);
 
-            this.rootVisualElement.Q<Button>("RefleshBtn").clicked += this.Reflesh;
-            this.rootVisualElement.Q<Button>("OpenResultDir").clicked += this.OpenResultsDir;
-            this.rootVisualElement.Q<Button>("NewFile").clicked += () =>
+            this.rootVisualElement.Q<Button>("RefleshBtn").clickable.clicked += this.Reflesh;
+            this.rootVisualElement.Q<Button>("OpenResultDir").clickable.clicked += this.OpenResultsDir;
+            this.rootVisualElement.Q<Button>("NewFile").clickable.clicked += () =>
             {
                 string memoryFile = EditorUtility.OpenFilePanel("SelectSnapShot", "", "snap");
                 var task = OpenFile(memoryFile, this.rootVisualElement.Q<VisualElement>("NewFileArea").Q<VisualElement>("Execute"));
             };
             this.Reflesh();
         }
+#else
+        private void OnEnableUnity2018(){
+            var slots = new Dictionary<string, VisualElement>();
+
+            string path = "Packages/com.utj.memorysnapshot2csv/Editor/UI/UXML2018";
+            string rootElemFile = System.IO.Path.Combine(path, "MemoryToCsv.uxml");
+
+            VisualTreeAsset rootElem = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(rootElemFile);
+            var node = rootElem.CloneTree(null);
+            this.rootVisualElement.Add(node);
+
+            string itemElemeFile = System.IO.Path.Combine(path, "SnapshotElement.uxml");
+            this.itemTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(itemElemeFile);
+
+            this.rootVisualElement.Q<Button>("RefleshBtn").clickable.clicked += this.Reflesh;
+            this.rootVisualElement.Q<Button>("OpenResultDir").clickable.clicked += this.OpenResultsDir;
+            this.rootVisualElement.Q<Button>("NewFile").clickable.clicked += () =>
+            {
+                string memoryFile = EditorUtility.OpenFilePanel("SelectSnapShot", "", "snap");
+                var task = OpenFile(memoryFile, this.rootVisualElement.Q<VisualElement>("NewFileArea").Q<VisualElement>("Execute"));
+            };
+            this.Reflesh();
+        }
+#endif
 
         private void Reflesh()
         {
@@ -71,11 +136,13 @@ namespace UTJ.MemoryProfilerToCsv
             this.RefleshList();
             foreach( var info in infoList)
             {
+#if UNITY_2019_1_OR_NEWER || UNITY_2019_OR_NEWER
                 var itemView = itemTreeAsset.CloneTree();
-
+#else
+                var itemView = itemTreeAsset.CloneTree(null);
+#endif
                 SetupItem(itemView, info);
                 scrollView.Add(itemView);
-
             }
         }
         private void SetupItem(VisualElement item ,SnapInfo info)
@@ -87,15 +154,14 @@ namespace UTJ.MemoryProfilerToCsv
                 item.Q<Label>("Platform").text = info.metadata.platform;
                 item.Q<Label>("DateTime").text = info.dateTime.ToString();
             }
-
-            item.Q<Button>("Open").clicked += () =>
+            item.Q<Button>("Open").clickable.clicked += () =>
             {
                 var executeVisualElement = item.Q<VisualElement>("Execute");
-
                 var task = OpenFile(info.filePath, executeVisualElement);
             };
         }
-        
+
+
 
 
         private async Task OpenFile(string path,VisualElement executeVisualElement )
@@ -103,7 +169,11 @@ namespace UTJ.MemoryProfilerToCsv
             executeVisualElement.visible = true;
             IProgress<float> progress = new Progress<float>( (p)=>
             {
-                executeVisualElement.Q<UnityEditor.UIElements.ProgressBar>("ProgressBar").value = p;
+#if UNITY_2019_1_OR_NEWER || UNITY_2019_OR_NEWER
+                executeVisualElement.Q<ProgressBar>("ProgressBar").value = p;
+#else
+                executeVisualElement.Q<Label>("Progress").text = p + "%";
+#endif
             });
             await Task.Run(() =>
             {
@@ -149,6 +219,10 @@ namespace UTJ.MemoryProfilerToCsv
         private List<SnapInfo> ScanMemorysanpshotFiles(string dir)
         {
             List<SnapInfo> snapfiles = new List<SnapInfo>();
+            if ( !Directory.Exists(dir))
+            {
+                return snapfiles;
+            }
             var files = Directory.GetFiles(dir,"*.snap");
             foreach( var file in files)
             {
